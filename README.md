@@ -1,60 +1,68 @@
-# Alaska-Snowfall-Analysis
-Codebase and accessory files necessary for installing the snowfall analysis for Alaska.  This program will download snowfall observations between user defined dates and times from the following sources:
+# Snowfall Analysis Tool
 
--Local Storm Reports (LSR)
--CoCoRahs
--COOP
--SNOTEL
--User input
+## Prerequisites
+- **ArcGIS Pro**: You must have ArcGIS Pro (with Spatial Analyst extension) installed on your local machine (ArcMap is not supported).
+- **ArcGIS Online (AGOL) Account**: Licensing is automatic and linked to your AGOL account. You will be prompted to log in upon launching ArcGIS Pro for the first time.
 
-The program will consolodate all these reports into a single .csv file with location information for input into ArcPro.  It will make an attempt to combine reports spanning multiple days and also to smooth out noisy snotel data.  
+## Installation Instructions
 
-Running this analysis, while pretty robust, will still require you to at least look at the data and QC appropriately.  The script is smart enough to get rid of some errors such as duplicate LSRs and noisy Snotel data but it doesn’t always catch everything.  Thus having human eyes on the data prior to analysis is important to create the best possible product.
+### Step 1: Download the Repository
+1. Clone the repo into a directory on your local machine using: git clone 
 
-In reality just gathering all sources of snowfall data into one location is one of the biggest benefits of this tool. If you have another data source for snowfall data that you would like to see added to to the tool, please let David Levin know.
+### Step 2: Clone Your ArcPro Conda Environment
+1. Open ArcGIS Pro and navigate to **Settings**.
+2. Click on **Python** (or **Package Manager** in the latest version of ArcGIS Pro) to view your current Conda environment.
+3. Click on **Manage Environments** (or the gear icon next to **Active Environment**) to display a list of your environments.
+4. If you haven’t already, click **Clone Default Environment** to create a copy of your main Conda environment. This cloned environment will be used for the tool. The cloning process may take a few minutes.
+5. Copy the address of your cloned environment for later use.
 
-Following the data collection step, the tool will then analyze the data in gridded format using either a basic inverse distance weighting or a more complex empirical bayesian krieging regression process to incorporate topography using PRISM rasters.  Users can choose to increase or decrease the weight of the observations or to use the topography adjustment or not.  There are cases were where one or the other could produce a better analysis and a lot depends on the application and to some extent the observation density and area of analysis.
+### Step 3: Associate Python Scripts with the Correct Interpreter
+1. Right-click on `setup.py` and select **Open with** → **Choose another app**.
+2. Click **More apps**, scroll to the bottom, and select **Look for another app on this PC**.
+3. Navigate to the location of your cloned Conda environment (usually in `C:/Users/<YourName>/AppData`, which may be hidden. Enable hidden items in File Explorer if necessary).
+4. Inside the Conda environment folder, select the `python` application (not `pythonw`).
+5. This should associate all Python scripts in the folder with the correct interpreter, and you should only need to do this once.
+6. 'setup.py' should download your ArcPro .aprx file and associated .gdb and layers needed to run the tool as well as appropriate shapefiles.  It will also create the needed directories on your local machine.
 
-Choose your analysis area carefully.  You should be able to either select your entire CWA, or 1 or more zones within your CWA.  If you have a more localized event, I would recommend limiting your analysis to only areas with snowfall, otherwise snowfall will spread out into areas that actually didn’t receive any…much like “SERP” in GFE. Very rarely would you need the entire CWA (only for large widespread events). The analysis is only as good as the quality of the data going in as well as the density of the observations.  If you try to run the analysis over a large area with only 2-3 observations, you’re not going to get a very pretty map!  
+## Running the Tool
 
-If you choose to use the “Adjust for Topo” option, it's quite helpful to run this over a subset of the forecast area rather than the entire CWA…otherwise it takes quite a while to generate!
+### Quality Control (QC) and Analysis Workflow
+1. **Run `GetSnowfallData.py`**:
+   - Launch the script by double-clicking or right-clicking and selecting **Run With ArcGIS Pro**.
+   - Enter the start and end dates (UTC) for snowfall data retrieval (pad times to capture all data sources).
+   - Optionally, enter site IDs for known zero snowfall locations, separated by commas (e.g., `pajn,paoh,sdia2,kkea2,pags,pagy,pahn`).
+   - Click **Get Snowfall Data In Between The Above Times**.
+   - A pop-up will indicate the output file to QC. Click **OK** and then **Quit** on the GUI.
 
-If you have installed according to the instructions, you should be able to run the scripts from a desktop shortcut by either double clicking or if that doesn’t launch the GUI, then by right clicking and selecting “Run With ArcGis Pro”.  
+2. **QC the Data**:
+   - Open the generated spreadsheet and review COOP and SNOTEL data.
+   - Ensure COOP data timestamps are correct.
+   - Check SNOTEL data for unrealistic values and modify or delete erroneous values.
+   - Graphics of SNOTEL smoothing results are available in the `SnotelGraphics` directory.
+   - Remove duplicate or outdated LSRs using the `datetime` field.
+   - Save the spreadsheet once QC is complete.
 
-You will need to run “GetSnowfallData” first, then QC the output prior to running “RunSnowfallAnalysis”
+3. **Run `RunSnowfallAnalysis.py`**:
+   - Launch the script and follow the GUI prompts.
+   - Select the **CWA** and appropriate zones for analysis.
+   - Enter a **title** for the generated graphic.
+   - Adjust **Observation Weight** (default is 1; higher values give more weight to individual observations, making the map less smooth).
+   - Use the **population density threshold** (e.g., 500 or 1000) to filter displayed cities.
+   - Choose whether to enable **Adjust for Topo**:
+     - **Unchecked**: Uses simple inverse distance weighting (similar to SERP in GFE).
+     - **Checked**: Uses **Empirical Bayesian Kriging Regression** with PRISM data to fit snowfall data to topography.
+   - Click **Create Analysis With Above Selection**.
+   - A pop-up will indicate when the analysis is complete.
 
-1. Launch the GUI for GetSnowfallData by following the above instructions.  Enter the start and end dates (UTC) for which to search for data (usually pad the event start and end times by a bit just to make sure you get the most data…i.e. COOPs and CoCoRahs…LSRs that may have trickled in).
+4. **Review the Output Graphics**:
+   - Two graphics will be generated:
+     - One with **zone-based statistics** (10-90th percentile, median, mean snowfall per zone).
+     - One designed for **public sharing**.
 
-2. Sometimes it can be helpful to put in some sites where you know there was 0 snowfall to help out the analysis.  If you choose to do that, enter the site IDs into the dialog box separated by commas (EX:  pajn,paoh,sdia2,kkea2,pags,pagy,pahn etc)  The script will then fill in the spreadsheet with these sites and a “0” amount for snowfall.  If you don’t wish to add sites with zero snowfall, just leave the dialog box blank and proceed to step 3.
-   
-3. Click “Get Snowfall Data In Between The Above Times”.  When the script is done running, you’ll get a pop up which will tell you the file to check (QC).  Click “OK” then “Quit” on the GUI and proceed to step 2
-   
-4. Navigate to the spreadsheet generated by the above script and QC the data.  Check to make sure the COOP data is from the correct time and that the Snotels aren’t giving you unrealistic values…and remove/change anything that looks off.  For a check on the Snotels, the script will generate graphics of the smoothed Snotel data so you can see what it’s using…(it uses the red line max minus min within your time frame).  These graphics are located in the “SnotelGraphics” directory.  If the smoother did not work, you can delete the Snotel or use the SWE/Precip + representative SLR to generate an estimated total and change it on the spreadsheet. Note that COOP data and CoCoRahs data that spans multiple 24hr report times will be 	a summation.  While the program will also delete duplicate LSRs and take only the most recent , you may need to delete older LSRs from sites that are nearby in order for the analysis to show the most up-to-date information.  Use the “datetime” field as your guide!
+### Congratulations! 🎉
+Your snowfall analysis is now complete. If you have suggestions for additional data sources, please contact David Levin.
 
-5. Once you’re happy with the data, click “Save” on the spreadsheet
-   
-6. Launch “RunSnowfallAnalysis”.  Follow the instructions on the GUI to generate the graphic.
-   
-7. Make sure you have your CWA selected and the appropriate zone(s).
-   
-8. Enter a title for your graphic in the title box.
-      
-9. For “Observation Weight” the default is “1” which places less weight on individual obs and creates a smoother plot.  If you want obs to have more weight, increase this number…with the understanding that your plot may not be quite as smooth!
-    
-10. I have also added a “cities” shapefile, but to avoid having it show every tiny community in the area, you may want to use a population density threshold such as 500 or 1000 to thin them out.
-      
-11. If you leave the “Check To Adjust For Topo” box unchecked, the tool will use a simplistic inverse distance weighting to analyze the snowfall data (somewhat similar to “Serp” in GFE).  Topographic gradients will not be taken into account. If you choose to use the “Check To Adjust For Topo” box, the tool will use the Empirical Bayesian Kriging Regression tool to fit the data to the topography using PRISM data.
-    
-12. Finally,  hit “Create Analysis With Above Selection”.  A popup will appear when the graphics are done generating.
-
-13. You will see 2 graphics, one has statistics for each zone (10-90th percentile, median, mean snowfall per zone).  The other is designed to be more shareable.
-
-
-
-
-
-
-
+For any issues, feel free to reach out!
 
 
 
