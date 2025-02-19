@@ -6,8 +6,8 @@
 
 ## Installation Instructions
 
-### Step 1: Download the Repository
-1. Clone the repo into a directory on your local machine using: git clone 
+### Step 1: Clone the Repository
+1. Clone the repo into a directory on your local machine using: "git clone https://github.com/david-levin11/Alaska-Snowfall-Analysis.git"
 
 ### Step 2: Clone Your ArcPro Conda Environment
 1. Open ArcGIS Pro and navigate to **Settings**.
