@@ -23,7 +23,7 @@
 4. Inside the Conda environment folder, select the `python` application (not `pythonw`).
 5. This should associate all Python scripts in the folder with the correct interpreter, and you should only need to do this once.
 6. 'setup.py' should download your ArcPro .aprx file and associated .gdb and layers needed to run the tool as well as appropriate shapefiles.  It will also create the needed directories on your local machine.
-7. # Note that any time the Alaska public zones are updated, you'll need to re-run 'setup.py' to stay current!
+7. #### Note that any time the Alaska public zones are updated, you'll need to re-run 'setup.py' to stay current!
 
 ## Running the Tool
 
