@@ -26,16 +26,21 @@ def removegraphics(gpath):
     for f in os.listdir(gpath):
         os.remove(os.path.join(gpath, f))
 
-def downloadLSR(base_url, start, end, wfo):
-    base_url+='sts='+start+'&ets='+end+'&wfos='+wfo+'&callback=gotData'
-    page = urllib.request.urlopen(base_url)
-    data = page.read()
-    return data
+# def downloadLSR(base_url, start, end, wfo):
+#     base_url+='sts='+start+'&ets='+end+'&wfos='+wfo+'&callback=gotData'
+#     page = urllib.request.urlopen(base_url)
+#     data = page.read()
+#     return data
 
-def parse_json(data):
-    # Converting from json to python dictionary
-    json_dict = json.loads(data)
-    return json_dict
+def downloadLSR(base_url, start, end, wfo):
+    # base_url like "https://example/lsr?"; we’ll handle "?" vs none below
+    params = {"sts": start, "ets": end, "wfos": wfo}
+    separator = "&" if "?" in base_url else "?"
+    url = base_url + separator + urllib.parse.urlencode(params)
+
+    with urllib.request.urlopen(url, timeout=20) as resp:
+        return json.load(resp)  # returns a Python dict
+
 
 def formatLSRcsv(json_dict, outputdict):
     # looping through the json features
@@ -493,8 +498,9 @@ def execute(START, END, WFO, ZEROS):
     else:
         pass
         
-    lsrdata = downloadLSR(LSRURL, START, END, WFO)
-    lsr_json = parse_json(lsrdata)
+    lsr_json = downloadLSR(LSRURL, START, END, WFO)
+    #print(f"LSR data is: {lsr_json}")
+    #lsr_json = parse_json(lsrdata)
     lsr_df = pd.DataFrame(formatLSRcsv(lsr_json, LSR_DICT))
     logger.info('Got LSRs!')
     #print(lsr_json)
