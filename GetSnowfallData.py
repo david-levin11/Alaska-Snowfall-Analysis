@@ -73,6 +73,7 @@ def downloadSNOTELCWA(url, cwa, start, end, networkkey, token):
      # Initializing our url
     url += 'cwa='+cwa
     url += '&start='+start+'&end='+end+'&network='+networkkey+'&units=english&token='+token
+    print(f"URL is: {url}")
     page = urllib.request.urlopen(url)
     data = page.read()
     return data
@@ -145,6 +146,9 @@ def pctchangefilter(df, col, newcol, thresh, window, absolute=False):
     return df
 
 def calcsnotelstats(wxlist):
+    # If list is empty or None → return zeros
+    if not wxlist:   # catches [] and None
+        return 0, 0, 0, 0
     #converting to numpy array
     oblist = np.array(wxlist)
     maxval = round(oblist.max(),1)
@@ -162,52 +166,60 @@ def formatSNOTELcsv(graphicspath, jsondict, outputdict, variables, start, end, p
     if plot:
         removegraphics(graphicspath)
     for site in jsondict['STATION']:
+       
         # appending metadata
         outputdict['STID'].append(site['STID'])
         outputdict['Lat'].append(site['LATITUDE'])
         outputdict['Lon'].append(site['LONGITUDE'])
         outputdict['ObType'].append('SNOTEL')
+        # print(f'Site is: {site["STID"]}')
+        # print(f"Snow depth is: {site['OBSERVATIONS']['snow_depth_set_1']}")
+        # print(f"Snow water equivalent is: {site['OBSERVATIONS']['snow_water_equiv_set_1']}")
+        # print(f"Precip is: {site['OBSERVATIONS']['precip_accum_set_1']}")
+        # print(f"Temp is: {site['OBSERVATIONS']['air_temp_set_1']}")
         datetimes = site['OBSERVATIONS']['date_time']
         dt_converted = [datetime.strptime(x, '%Y-%m-%dT%H:%M:%SZ') for x in datetimes]
         dates = pd.DataFrame(dt_converted, columns = ['DateTime'])
         #getting the snow depth and smoothing
-        try:
-            depth = site['OBSERVATIONS']['snow_depth_set_1']
-            depthdf = pd.DataFrame(depth, columns = ['Raw'])
-            # calculating stats from the raw data
-            median = depthdf['Raw'].median()
-            std = depthdf['Raw'].std()
-            maximum = depthdf['Raw'].max()
-            minimum = depthdf['Raw'].min()
-            spread = maximum - minimum
-            # thesholds for filtering vary depending on how much spread there is
-            if spread >= 50:
-                threshold = median+std
-            else:
-                threshold = median+std*4
-            # filtering out high outliers from the raw data
-            df_filtered = second_filter(depthdf, 'Raw', 'Adj_Depth', threshold)
-            # filtering out rates > 5 inch per hour
-            df_filtered = ratefilter(df_filtered, 'Adj_Depth', 'Adj_Depth', 5)             
-            # recalculating the stats from the filtered data
-            newmaximum = df_filtered['Adj_Depth'].max()
-            newminimum = df_filtered['Adj_Depth'].min()
-            newmedian = df_filtered['Adj_Depth'].median()
-            newspread = newmaximum - newminimum
-            if newmedian <= 30:
-                pct_thresh = 0.75
-            elif newmedian > 30 and newmedian <= 50:
-                pct_thresh = 0.4
-            else:
-                pct_thresh = 0.2
-            # filtering on percent change in 12 hrs from thesholds calculated above
-            pctchangefilter(df_filtered, 'Adj_Depth','Adj_Depth', pct_thresh, 12)
-            # interpolating again
-            df_filtered['Adj_Depth'] = df_filtered['Adj_Depth'].interpolate()
-            # applying a 12 hr moving mean
-            df_filtered['MovingMean']=df_filtered['Adj_Depth'].rolling(window=12).mean()
-        except KeyError:
-            df_filtered = pd.DataFrame([], columns = ['Raw','Rate','Adj_Depth','MovingMean'])
+        #try:
+        depth = site['OBSERVATIONS']['snow_depth_set_1']
+        depthdf = pd.DataFrame(depth, columns = ['Raw'])
+        # calculating stats from the raw data
+        median = depthdf['Raw'].median()
+        std = depthdf['Raw'].std()
+        maximum = depthdf['Raw'].max()
+        minimum = depthdf['Raw'].min()
+        spread = maximum - minimum
+        # thesholds for filtering vary depending on how much spread there is
+        if spread >= 50:
+            threshold = median+std
+        else:
+            threshold = median+std*4
+        # filtering out high outliers from the raw data
+        df_filtered = second_filter(depthdf, 'Raw', 'Adj_Depth', threshold)
+        # filtering out rates > 5 inch per hour
+        df_filtered = ratefilter(df_filtered, 'Adj_Depth', 'Adj_Depth', 5)             
+        # recalculating the stats from the filtered data
+        newmaximum = df_filtered['Adj_Depth'].max()
+        newminimum = df_filtered['Adj_Depth'].min()
+        newmedian = df_filtered['Adj_Depth'].median()
+        newspread = newmaximum - newminimum
+        if newmedian <= 30:
+            pct_thresh = 0.75
+        elif newmedian > 30 and newmedian <= 50:
+            pct_thresh = 0.4
+        else:
+            pct_thresh = 0.2
+        # filtering on percent change in 12 hrs from thesholds calculated above
+        pctchangefilter(df_filtered, 'Adj_Depth','Adj_Depth', pct_thresh, 12)
+        # interpolating again
+        df_filtered['Adj_Depth'] = df_filtered['Adj_Depth'].interpolate()
+        # applying a 12 hr moving mean
+        df_filtered['MovingMean']=df_filtered['Adj_Depth'].rolling(window=12).mean()
+        print(f"Filtered dataframe is: {df_filtered}")
+        #print(f"Site[observations] are: {site['OBSERVATIONS']}")
+        #except KeyError:
+        #    df_filtered = pd.DataFrame([], columns = ['Raw','Rate','Adj_Depth','MovingMean'])
         # grabbing the SWE
         try:
             SWEdf = pd.DataFrame(site['OBSERVATIONS']['snow_water_equiv_set_1'], columns = ['SWE'])
@@ -227,6 +239,12 @@ def formatSNOTELcsv(graphicspath, jsondict, outputdict, variables, start, end, p
         sitedf = pd.concat([dates, df_filtered, SWEdf, PCPdf, TMPdf], axis=1)
         # now we need to trim the data to our time range in question
         tr_df = sitedf.loc[(sitedf['DateTime'] >= trstart) & (sitedf['DateTime'] <= trend)]
+        # print("Site:", site["STID"])
+        # print("trstart:", trstart, "trend:", trend)
+        # print("data range:", sitedf["DateTime"].min(), "→", sitedf["DateTime"].max())
+        # print("mask True count:", ((sitedf["DateTime"] >= trstart) & (sitedf["DateTime"] <= trend)).sum())
+
+        # print(f"Dataframe is: {tr_df}")
         # now we can pick out the data we need
         for element in outputdict:
             if element == 'Smoothed_Depth':
@@ -360,8 +378,8 @@ def grabcoopvars(jsondict, snowvar, pcpvar):
         lat = site['LATITUDE']
         lon = site['LONGITUDE']
         obtype = 'COOP'
-        print(f'Name is: {name}')
-        print(site['OBSERVATIONS'])
+        #print(f'Name is: {name}')
+        #print(site['OBSERVATIONS'])
         try:
             snw = round(sum(site['OBSERVATIONS'][snowvar]),1)
             print(snw)
@@ -615,25 +633,25 @@ def input():
     # Grabbing our logger
     logger = logging.getLogger('')
     #execute(START, END, CWA, ZEROS)
-    try:
-        execute(START, END, CWA, ZEROS)
-        tkinter.messagebox.showwarning(title=None, message=f'All done with merging of snow data.  \n\nPlease check {os.path.join(DATAPATH, OUTFILE)} and QC final output before plotting! \n\nHit "Quit" to close main window or enter new dates to try again.')
-    except ValueError:
-        logger.info('Wrong datetime format! Must be YYYYmmddHHMM. Ex: 202012021800')
-        tkinter.messagebox.showwarning(title=None, message='Wrong datetime format! Must be YYYYmmddHHMM. Ex: 202012021800')
-        #tkinter.messagebox.showerror(title=None, message=None)
-        window.destroy()
-        sys.exit()
-    except UnboundLocalError:
-        logger.info('End date is before your start date.  Please try again!')
-        tkinter.messagebox.showwarning(title=None, message='End date is before your start date.  Please try again!')
-        window.destroy()
-        sys.exit()
-    except RuntimeError:
-        logger.info('Requested time range is > 5 days.  Try again with a shorter time range')
-        tkinter.messagebox.showwarning(title=None, message='Requested time range is > 5 days.  Try again with a shorter time range')
-        window.destroy()
-        sys.exit()
+    #try:
+    execute(START, END, CWA, ZEROS)
+    tkinter.messagebox.showwarning(title=None, message=f'All done with merging of snow data.  \n\nPlease check {os.path.join(DATAPATH, OUTFILE)} and QC final output before plotting! \n\nHit "Quit" to close main window or enter new dates to try again.')
+    # except ValueError:
+    #     logger.info('Wrong datetime format! Must be YYYYmmddHHMM. Ex: 202012021800')
+    #     tkinter.messagebox.showwarning(title=None, message='Wrong datetime format! Must be YYYYmmddHHMM. Ex: 202012021800')
+    #     #tkinter.messagebox.showerror(title=None, message=None)
+    #     window.destroy()
+    #     sys.exit()
+    # except UnboundLocalError:
+    #     logger.info('End date is before your start date.  Please try again!')
+    #     tkinter.messagebox.showwarning(title=None, message='End date is before your start date.  Please try again!')
+    #     window.destroy()
+    #     sys.exit()
+    # except RuntimeError:
+    #     logger.info('Requested time range is > 5 days.  Try again with a shorter time range')
+    #     tkinter.messagebox.showwarning(title=None, message='Requested time range is > 5 days.  Try again with a shorter time range')
+    #     window.destroy()
+    #     sys.exit()
 
 window = tkinter.Tk()
 
