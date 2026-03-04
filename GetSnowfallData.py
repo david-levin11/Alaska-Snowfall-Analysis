@@ -166,7 +166,6 @@ def formatSNOTELcsv(graphicspath, jsondict, outputdict, variables, start, end, p
     if plot:
         removegraphics(graphicspath)
     for site in jsondict['STATION']:
-       
         # appending metadata
         outputdict['STID'].append(site['STID'])
         outputdict['Lat'].append(site['LATITUDE'])
@@ -181,45 +180,45 @@ def formatSNOTELcsv(graphicspath, jsondict, outputdict, variables, start, end, p
         dt_converted = [datetime.strptime(x, '%Y-%m-%dT%H:%M:%SZ') for x in datetimes]
         dates = pd.DataFrame(dt_converted, columns = ['DateTime'])
         #getting the snow depth and smoothing
-        #try:
-        depth = site['OBSERVATIONS']['snow_depth_set_1']
-        depthdf = pd.DataFrame(depth, columns = ['Raw'])
-        # calculating stats from the raw data
-        median = depthdf['Raw'].median()
-        std = depthdf['Raw'].std()
-        maximum = depthdf['Raw'].max()
-        minimum = depthdf['Raw'].min()
-        spread = maximum - minimum
-        # thesholds for filtering vary depending on how much spread there is
-        if spread >= 50:
-            threshold = median+std
-        else:
-            threshold = median+std*4
-        # filtering out high outliers from the raw data
-        df_filtered = second_filter(depthdf, 'Raw', 'Adj_Depth', threshold)
-        # filtering out rates > 5 inch per hour
-        df_filtered = ratefilter(df_filtered, 'Adj_Depth', 'Adj_Depth', 5)             
-        # recalculating the stats from the filtered data
-        newmaximum = df_filtered['Adj_Depth'].max()
-        newminimum = df_filtered['Adj_Depth'].min()
-        newmedian = df_filtered['Adj_Depth'].median()
-        newspread = newmaximum - newminimum
-        if newmedian <= 30:
-            pct_thresh = 0.75
-        elif newmedian > 30 and newmedian <= 50:
-            pct_thresh = 0.4
-        else:
-            pct_thresh = 0.2
-        # filtering on percent change in 12 hrs from thesholds calculated above
-        pctchangefilter(df_filtered, 'Adj_Depth','Adj_Depth', pct_thresh, 12)
-        # interpolating again
-        df_filtered['Adj_Depth'] = df_filtered['Adj_Depth'].interpolate()
-        # applying a 12 hr moving mean
-        df_filtered['MovingMean']=df_filtered['Adj_Depth'].rolling(window=12).mean()
-        print(f"Filtered dataframe is: {df_filtered}")
+        try:
+            depth = site['OBSERVATIONS']['snow_depth_set_1']
+            depthdf = pd.DataFrame(depth, columns = ['Raw'])
+            # calculating stats from the raw data
+            median = depthdf['Raw'].median()
+            std = depthdf['Raw'].std()
+            maximum = depthdf['Raw'].max()
+            minimum = depthdf['Raw'].min()
+            spread = maximum - minimum
+            # thesholds for filtering vary depending on how much spread there is
+            if spread >= 50:
+                threshold = median+std
+            else:
+                threshold = median+std*4
+            # filtering out high outliers from the raw data
+            df_filtered = second_filter(depthdf, 'Raw', 'Adj_Depth', threshold)
+            # filtering out rates > 5 inch per hour
+            df_filtered = ratefilter(df_filtered, 'Adj_Depth', 'Adj_Depth', 5)             
+            # recalculating the stats from the filtered data
+            newmaximum = df_filtered['Adj_Depth'].max()
+            newminimum = df_filtered['Adj_Depth'].min()
+            newmedian = df_filtered['Adj_Depth'].median()
+            newspread = newmaximum - newminimum
+            if newmedian <= 30:
+                pct_thresh = 0.75
+            elif newmedian > 30 and newmedian <= 50:
+                pct_thresh = 0.4
+            else:
+                pct_thresh = 0.2
+            # filtering on percent change in 12 hrs from thesholds calculated above
+            pctchangefilter(df_filtered, 'Adj_Depth','Adj_Depth', pct_thresh, 12)
+            # interpolating again
+            df_filtered['Adj_Depth'] = df_filtered['Adj_Depth'].interpolate()
+            # applying a 12 hr moving mean
+            df_filtered['MovingMean']=df_filtered['Adj_Depth'].rolling(window=12).mean()
+            print(f"Filtered dataframe is: {df_filtered}")
         #print(f"Site[observations] are: {site['OBSERVATIONS']}")
-        #except KeyError:
-        #    df_filtered = pd.DataFrame([], columns = ['Raw','Rate','Adj_Depth','MovingMean'])
+        except KeyError:
+           df_filtered = pd.DataFrame([], columns = ['Raw','Rate','Adj_Depth','MovingMean'])
         # grabbing the SWE
         try:
             SWEdf = pd.DataFrame(site['OBSERVATIONS']['snow_water_equiv_set_1'], columns = ['SWE'])
