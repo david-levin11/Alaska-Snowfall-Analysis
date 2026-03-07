@@ -129,6 +129,8 @@ SNOTEL_URL = "https://api.synopticdata.com/v2/stations/timeseries?"
 TOKEN = "c6c8a66a96094960aabf1fed7d07ccf0"
 # variable to look for
 VARS = "snow_depth_set_1"
+# only download sites with snow depth (this can be things other than actual SNOTELS)
+VARKEY = "snow_depth"
 # variables we want from our snotels
 SNOTEL_VARS = [
     "snow_depth_set_1",
@@ -140,7 +142,7 @@ SNOTEL_VARS = [
 NETWORK = "25"
 ### Miscellaneous config
 # number of days back to look for your time series in order to smooth it
-DAYSBACK = 15
+DAYSBACK = 30
 # Set up the columns for your snotel dataframe
 SNOTEL_DICT = {
     "STID": [],
