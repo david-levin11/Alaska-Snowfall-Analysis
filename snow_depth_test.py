@@ -186,11 +186,12 @@ def rate_check_since_last_good(
     up_rate=2.0,
     down_rate=2.0,
     prev_cols=("QC_gross","QC_consistency","QC_spike"),
+    out_col="QC_rate",
 ):
     df = df.sort_index().copy()
-    df["QC_rate"] = "PASS"
+    df[out_col] = "SKIP"
 
-    elig = eligible_mask(df, list(prev_cols)).to_numpy()
+    elig = df[list(prev_cols)].eq("PASS").all(axis=1).to_numpy()
     vals = df[check_col].astype(float).to_numpy()
     times = df.index.to_numpy()
 
@@ -201,6 +202,7 @@ def rate_check_since_last_good(
             continue
 
         if last_good_i is None:
+            df.iloc[i, df.columns.get_loc(out_col)] = "PASS"
             last_good_i = i
             continue
 
@@ -209,13 +211,15 @@ def rate_check_since_last_good(
             continue
 
         rate = (vals[i] - vals[last_good_i]) / dt_hours
+
         if (rate > up_rate) or (rate < -down_rate):
-            df.iloc[i, df.columns.get_loc("QC_rate")] = "FAIL"
-            # do NOT update last_good_i
+            df.iloc[i, df.columns.get_loc(out_col)] = "FAIL"
         else:
+            df.iloc[i, df.columns.get_loc(out_col)] = "PASS"
             last_good_i = i
 
     return df
+
 
 def final_qc(df, qc_cols=("QC_gross","QC_consistency","QC_spike","QC_rate")):
     df = df.copy()
@@ -237,6 +241,47 @@ def interpolate_and_fill(df, ma_col, qc_col, output_col="raw_interp", max_gap=3)
     )
 
     df[output_col] = interp.ffill()
+
+    return df
+
+def should_run_repeated_check(df, check_col="Raw", range_thresh=100):
+    """
+    Decide whether a site is suspicious enough to justify a repeated-run check.
+
+    range_thresh: apply repeated-run filter only if 30-day range exceeds this value
+    """
+    x = pd.to_numeric(df[check_col], errors="coerce")
+    if x.notna().sum() < 2:
+        return False
+
+    site_range = x.max() - x.min()
+    return site_range >= range_thresh
+
+
+def repeated_run_check(df, check_col, window=12, max_unique=2, out_col="QC_repeat_run"):
+    """
+    Flag long runs where the sensor only cycles through a very small number
+    of rounded values.
+
+    window: number of consecutive hours to inspect
+    max_unique: maximum number of unique rounded values allowed in the window
+    """
+    df = df.copy()
+    df[out_col] = "PASS"
+
+    x = df[check_col].astype(float).round(2).to_numpy()
+    n = len(x)
+
+    for i in range(n - window + 1):
+        seg = x[i:i+window]
+
+        if np.isnan(seg).any():
+            continue
+
+        n_unique = len(np.unique(seg))
+
+        if n_unique <= max_unique:
+            df.iloc[i:i+window, df.columns.get_loc(out_col)] = "FAIL"
 
     return df
 
@@ -321,29 +366,37 @@ for site in jsondata["STATION"]:
     sitedf = pd.concat([dates, depthdf], axis=1)
     #applying filters if the filter check is True
     if filter_check:
-        df_hourly = drop_high_freq(sitedf, "DateTime")  
-        # df_hourly should be indexed by DateTime at this point
+        df_hourly = drop_high_freq(sitedf, "DateTime")
+
         df1 = gross_check(df_hourly, "Raw")
-        df2 = consistency_check(df1, "Raw", up=5, down=5, prev_cols=("QC_gross",))
-        df3 = spike_check(df2, "Raw", spikeval=5, prev_cols=("QC_gross","QC_consistency"))
-        df4 = rate_check_since_last_good(df3, "Raw", up_rate=2.0, down_rate=2.0, prev_cols=("QC_gross","QC_consistency","QC_spike"))
-        df5 = final_qc(df4)
-        df_interp = interpolate_and_fill(df5, "Raw", "QC_flag")  # or forward-fill only, per your preference
+
+        if should_run_repeated_check(df1, "Raw", range_thresh=100):
+            df2 = repeated_run_check(df1, "Raw", window=12, max_unique=2)
+        else:
+            df2 = df1.copy()
+            df2["QC_repeat_run"] = "PASS"
+
+        df3 = consistency_check(df2, "Raw", up=5, down=5, prev_cols=("QC_gross", "QC_repeat_run"))
+        df4 = spike_check(df3, "Raw", spikeval=5, prev_cols=("QC_gross", "QC_repeat_run", "QC_consistency"))
+        df5 = rate_check_since_last_good(
+            df4,
+            "Raw",
+            up_rate=1.5,
+            down_rate=1.5,
+            prev_cols=("QC_gross", "QC_repeat_run", "QC_consistency", "QC_spike"),
+            out_col="QC_rate"
+        )
+        df6 = final_qc(df5, qc_cols=("QC_gross", "QC_repeat_run", "QC_consistency", "QC_spike", "QC_rate"))
+        df_interp = interpolate_and_fill(df6, "Raw", "QC_flag", output_col="raw_interp")
         df_snow_depth = create_moving_average(df_interp, "raw_interp")
         if site["STID"] == "JTMA2" or site["STID"] == "HMWA2":
-            df_interp.to_csv(f"{site['STID']}.csv")
+            df_snow_depth.to_csv(f"{site['STID']}.csv")
         #plotting
         plottimeseriessmoothed(SC.GRAPHICSPATH, df_snow_depth.index, site["STID"], df_snow_depth["Raw"], df_snow_depth["raw_interp"], df_snow_depth["snowfall"])
         print(f"Done plotting snow depth data for {site['STID']}")
         
 
-#TODO
-#Check for higher than expected values  (i.e. when it is snowing)
-#If ‘value is more than 5 inches above the next 5 values’ then QC Fail
-#Check for rate of change since the last good value
-#If ‘value is more than 2 inches per hour above the last good reading’ then QC Fail
-#Interpolate between good values in the moving average time series
-#Copy forward the last good value in the moving average time series to the end of the series
+
 
 
 

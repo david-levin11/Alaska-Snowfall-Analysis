@@ -78,6 +78,29 @@ def downloadSNOTELCWA(url, cwa, start, end, networkkey, token):
     data = page.read()
     return data
 
+def downloadSNOTELCWA_dev(url, cwa, start, end, varkey, token, varsoperator="AND"):
+    '''
+    Parameters
+    ----------
+    url : Mesowest API Time Series URL
+    cwa : 3 Letter CWA indentifier
+    start : Start time of the time range you want snotel data for (YYYYmmddHHMM)
+    end : End time of the time range you want snotel data for (YYYYmmddHHMM)
+    networkkey : Network ID from Mesowest API documentation (25 is Snotels)
+    token : Your unique MesoWest API token
+    Returns
+    -------
+    data : Json dictionary of Snotel output
+
+    '''
+     # Initializing our url
+    url += 'cwa='+cwa
+    url += '&start='+start+'&end='+end+'&vars='+varkey+'&varsoperator='+varsoperator+'&units=english&token='+token
+    #print(f"URL is: {url}")
+    page = urllib.request.urlopen(url)
+    data = page.read()
+    return data
+
 def parse_json(data):
     # Converting from json to python dictionary
     json_dict = json.loads(data)
@@ -464,6 +487,8 @@ VARS = SC.VARS
 SNOTEL_VARS = SC.SNOTEL_VARS
 
 NETWORK = SC.NETWORK
+
+VARKEY = SC.VARKEY
  
 SNOTEL_SHEET = False
 
@@ -571,10 +596,12 @@ def execute(START, END, WFO, ZEROS):
         orig_start = datetime.strptime(START, '%Y%m%d%H%M')
         if orig_start < calc_start:
             # downloading the data
-            rawdata = downloadSNOTELCWA(SNOTEL_URL, WFO, START, endtime, NETWORK, TOKEN)
+            #rawdata = downloadSNOTELCWA(SNOTEL_URL, WFO, START, endtime, NETWORK, TOKEN)
+            rawdata = downloadSNOTELCWA_dev(SNOTEL_URL, WFO, START, endtime, VARKEY, TOKEN)
         else:
             # downloading the data
-            rawdata = downloadSNOTELCWA(SNOTEL_URL, WFO, starttime, endtime, NETWORK, TOKEN)
+            #rawdata = downloadSNOTELCWA(SNOTEL_URL, WFO, starttime, endtime, NETWORK, TOKEN)
+            rawdata = downloadSNOTELCWA_dev(SNOTEL_URL, WFO, starttime, endtime, VARKEY, TOKEN)
         jsondata = parse_json(rawdata)
         logger.info('Got the data!')
         #print(jsondata)
