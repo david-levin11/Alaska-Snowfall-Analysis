@@ -116,6 +116,9 @@ PCPVAR = "precip_accum_24_hour_set_1"
 # network to pull from Mesowest
 COOPNETWORK = "72,73,74,75,76,77,78,79,80"
 
+# list of COOP networks
+COOPIDS = [range(72,81)]
+
 ########################### Snotel Auto Download Config #######################
 
 ## Config for downloading snotel from MesoWest
@@ -148,10 +151,9 @@ SNOTEL_DICT = {
     "STID": [],
     "Lat": [],
     "Lon": [],
+    "Raw": [],
     "Filtered_Depth": [],
     "Smoothed_Depth": [],
-    "SWE": [],
-    "Precip": [],
     "ObType": [],
 }
 
