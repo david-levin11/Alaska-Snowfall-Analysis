@@ -578,6 +578,11 @@ def formatSNOTELcsv(graphicspath, jsondata, outputdict, start, end, plot=True):
                 raw_out = depth_change["Raw"].iloc[-1] - depth_change["Raw"].iloc[0]
                 filtered_out = depth_change["raw_interp"].iloc[-1] - depth_change["raw_interp"].iloc[0]
                 smoothed_out = depth_change["snowfall"].iloc[-1] - depth_change["snowfall"].iloc[0]
+                # Don't include negative snow depths for mapping purposes
+                if filtered_out < 0:
+                    filtered_out = 0.0
+                if smoothed_out < 0:
+                    smoothed_out = 0.0
 
         else:
             depth_dict = manual_depth_change(sitedf, trstart, trend, value_col="Raw", time_col="DateTime")
@@ -585,6 +590,11 @@ def formatSNOTELcsv(graphicspath, jsondata, outputdict, start, end, plot=True):
                 raw_out = depth_dict["depth_change"]
                 filtered_out = depth_dict["depth_change"]
                 smoothed_out = depth_dict["depth_change"]
+                # Don't include negative snow depths for mapping purposes
+                if filtered_out < 0:
+                    filtered_out = 0.0
+                if smoothed_out < 0:
+                    smoothed_out = 0.0
         #print(f"Columns are: {df_snow_depth.columns}")
         outputdict['STID'].append(site['STID'])
         outputdict['Lat'].append(site['LATITUDE'])
