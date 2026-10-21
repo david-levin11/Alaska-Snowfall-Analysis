@@ -49,26 +49,51 @@ def formatLSRcsv(json_dict, outputdict):
 
 def downloadSNOTELCWA(url, cwa, start, end, varkey, token, varsoperator="AND"):
     '''
-    Parameters
-    ----------
-    url : Mesowest API Time Series URL
-    cwa : 3 Letter CWA indentifier
-    start : Start time of the time range you want snotel data for (YYYYmmddHHMM)
-    end : End time of the time range you want snotel data for (YYYYmmddHHMM)
-    networkkey : Network ID from Mesowest API documentation (25 is Snotels)
-    token : Your unique MesoWest API token
-    Returns
-    -------
-    data : Json dictionary of Snotel output
-
+    Modified to chunk requests by 3 days to avoid 'too many station hours' limit from Synoptic API.
     '''
-     # Initializing our url
-    url += 'cwa='+cwa
-    url += '&start='+start+'&end='+end+'&vars='+varkey+'&varsoperator='+varsoperator+'&units=english&token='+token
-    #print(f"URL is: {url}")
-    page = urllib.request.urlopen(url)
-    data = page.read()
-    return data
+    start_dt = datetime.strptime(start, '%Y%m%d%H%M')
+    end_dt = datetime.strptime(end, '%Y%m%d%H%M')
+    
+    merged_dict = {"STATION": []}
+    station_map = {}
+    
+    current_start = start_dt
+    chunk_days = 3
+    
+    while current_start < end_dt:
+        current_end = min(current_start + timedelta(days=chunk_days), end_dt)
+        
+        s_str = current_start.strftime('%Y%m%d%H%M')
+        e_str = current_end.strftime('%Y%m%d%H%M')
+        
+        req_url = url + f'cwa={cwa}&start={s_str}&end={e_str}&vars={varkey}&varsoperator={varsoperator}&units=english&token={token}'
+        
+        try:
+            page = urllib.request.urlopen(req_url)
+            data = json.loads(page.read())
+            
+            if "STATION" in data:
+                for st in data["STATION"]:
+                    stid = st["STID"]
+                    if stid not in station_map:
+                        station_map[stid] = st
+                    else:
+                        # Append unique observations from this chunk avoiding duplicates
+                        existing_times = set(station_map[stid]["OBSERVATIONS"].get("date_time", []))
+                        if "date_time" in st["OBSERVATIONS"]:
+                            for i, dt in enumerate(st["OBSERVATIONS"]["date_time"]):
+                                if dt not in existing_times:
+                                    for var, vals in st["OBSERVATIONS"].items():
+                                        if var in station_map[stid]["OBSERVATIONS"]:
+                                            station_map[stid]["OBSERVATIONS"][var].append(vals[i])
+                                    existing_times.add(dt)
+        except Exception as e:
+            print(f"Error fetching SNOTEL chunk {s_str} to {e_str}: {e}")
+            
+        current_start = current_end
+        
+    merged_dict["STATION"] = list(station_map.values())
+    return json.dumps(merged_dict).encode('utf-8')
 
 def parse_json(data):
     # Converting from json to python dictionary
@@ -509,6 +534,7 @@ def manual_depth_change(df, start_dt, end_dt, value_col="Raw", time_col="DateTim
 
 def formatSNOTELcsv(graphicspath, jsondata, outputdict, start, end, plot=True):
     # converting start and end to datetime objects
+    print(f"json data is: {jsondata}")
     trstart = datetime.strptime(start, '%Y%m%d%H%M')
     trend = datetime.strptime(end, '%Y%m%d%H%M')
     # removing old graphics first
@@ -690,25 +716,51 @@ def getCoCoRahs(start, end, duration):
 
 def downloadCOOP(url, cwa, networkkey, start, end, token):
     '''
-    Parameters
-    ----------
-    url : Mesowest API Time Series URL
-    cwa : 3 Letter CWA indentifier
-    start : Start time of the time range you want snotel data for (YYYYmmddHHMM)
-    end : End time of the time range you want snotel data for (YYYYmmddHHMM)
-    networkkey : Network ID from Mesowest API documentation (25 is Snotels)
-    token : Your unique MesoWest API token
-    Returns
-    -------
-    data : Json dictionary of Snotel output
-
+    Modified to chunk requests by 3 days to avoid 'too many station hours' limit from Synoptic API.
     '''
-     # Initializing our url
-    url += f'cwa={cwa}&network={networkkey}'
-    url += '&start='+start+'&end='+end+'&units=english&token='+token
-    page = urllib.request.urlopen(url)
-    data = page.read()
-    return data
+    start_dt = datetime.strptime(start, '%Y%m%d%H%M')
+    end_dt = datetime.strptime(end, '%Y%m%d%H%M')
+    
+    merged_dict = {"STATION": []}
+    station_map = {}
+    
+    current_start = start_dt
+    chunk_days = 3
+    
+    while current_start < end_dt:
+        current_end = min(current_start + timedelta(days=chunk_days), end_dt)
+        
+        s_str = current_start.strftime('%Y%m%d%H%M')
+        e_str = current_end.strftime('%Y%m%d%H%M')
+        
+        req_url = url + f'cwa={cwa}&network={networkkey}&start={s_str}&end={e_str}&units=english&token={token}'
+        
+        try:
+            page = urllib.request.urlopen(req_url)
+            data = json.loads(page.read())
+            
+            if "STATION" in data:
+                for st in data["STATION"]:
+                    stid = st["STID"]
+                    if stid not in station_map:
+                        station_map[stid] = st
+                    else:
+                        # Append unique observations from this chunk avoiding duplicates
+                        existing_times = set(station_map[stid]["OBSERVATIONS"].get("date_time", []))
+                        if "date_time" in st["OBSERVATIONS"]:
+                            for i, dt in enumerate(st["OBSERVATIONS"]["date_time"]):
+                                if dt not in existing_times:
+                                    for var, vals in st["OBSERVATIONS"].items():
+                                        if var in station_map[stid]["OBSERVATIONS"]:
+                                            station_map[stid]["OBSERVATIONS"][var].append(vals[i])
+                                    existing_times.add(dt)
+        except Exception as e:
+            print(f"Error fetching COOP chunk {s_str} to {e_str}: {e}")
+            
+        current_start = current_end
+        
+    merged_dict["STATION"] = list(station_map.values())
+    return json.dumps(merged_dict).encode('utf-8')
 
 def grabcoopvars(jsondict, snowvar, pcpvar):
     coopdata = {'stationname': [], 'stid': [], 'Lat': [], 'Lon': [], 'datetime': [], 'snowfall': [], 'Precip': [], 'ObType': []}
