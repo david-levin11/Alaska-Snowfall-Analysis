@@ -88,7 +88,7 @@ def download_cwa_shapefiles(shapedir):
 
 def update_shapefiles():
     """Main function to update zone and CWA shapefiles."""
-    shapedir = "./shapefiles"
+    shapedir = SC.shpdir
     ensure_dir(shapedir)
     clear_directory(shapedir)
     zones = fetch_zones()
