@@ -66,7 +66,11 @@ def downloadSNOTELCWA(url, cwa, start, end, varkey, token, varsoperator="AND"):
         s_str = current_start.strftime('%Y%m%d%H%M')
         e_str = current_end.strftime('%Y%m%d%H%M')
         
-        req_url = url + f'cwa={cwa}&start={s_str}&end={e_str}&vars={varkey}&varsoperator={varsoperator}&units=english&token={token}'
+        # Exclude AKDOT stations, which can report a constant zero snow depth.
+        req_url = (
+            url + f'cwa={cwa}&network=!90&start={s_str}&end={e_str}'
+            f'&vars={varkey}&varsoperator={varsoperator}&units=english&token={token}'
+        )
         
         try:
             page = urllib.request.urlopen(req_url)
